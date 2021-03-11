@@ -1,0 +1,168 @@
+kind: Cluster
+metadata:
+  name: persistence-101-aws
+  space: transient
+spec:
+  master:
+    locations:
+      - aws:
+          instanceType: t3.medium
+          availabilityZones:
+            - us-east-1e
+          overrideImageId: ami-02354e95b39ca8dec
+          imageRootDeviceName: /dev/xvda
+          groupType: asg-mip
+          mixedInstancesPolicyCloudFormationExtras:
+            InstancesDistribution:
+              OnDemandPercentageAboveBaseCapacity: 0
+            LaunchTemplate:
+              Overrides:
+                - InstanceType: t3.medium
+                - InstanceType: t2.medium
+          instanceMonitoring: false
+          rootVolume:
+            size: 40
+          sshKey: cloudify
+          subnetIds:
+            - ''
+        locationRef: aws1
+    minNodes: 1
+    kublrVariant: aws-ubuntu-18.04
+    kublrAgentConfig:
+      kublr:
+        psp:
+          default_clusterrole: 'psp:privileged'
+  kublrAgentTgzUrl: 'https://repo.kublr.com/repository/gobinaries/kublr/1.19.7-26/kublr-1.19.7-26-linux.tar.gz'
+  locations:
+    - name: aws1
+      aws:
+        region: us-east-1
+        enableTerminationProtection: false
+        awsApiAccessSecretRef: ws
+        resourcesCloudFormationExtras:
+          DevOpsDemoEFS:
+            Type: AWS::EFS::FileSystem
+            Properties: {}
+          DevOpsDemoEFSMT4:
+            Type: AWS::EFS::MountTarget
+            Properties: 
+              FileSystemId: { Ref: DevOpsDemoEFS }
+              SecurityGroups: [ { "Fn::GetAtt": [ NewVpc, DefaultSecurityGroup ] } ]
+              SubnetId: { Ref: SubnetNodePublic4 }
+          DevOpsDemoEFSMT5:
+            Type: AWS::EFS::MountTarget
+            Properties:
+              FileSystemId: { Ref: DevOpsDemoEFS }
+              SecurityGroups: [ { "Fn::GetAtt": [ NewVpc, DefaultSecurityGroup ] } ]
+              SubnetId: { Ref: SubnetNodePublic5 }
+          DevOpsDemoPrivateHostedZone:
+            Type: AWS::Route53::HostedZone
+            Properties:
+              Name: cluster.kublr.local
+              VPCs: 
+                - VPCId: { Ref: NewVpc }
+                  VPCRegion: { Ref: 'AWS::Region' }
+          DevOpsDemoPrivateHostedZoneRecordSetEFS:
+            Type: AWS::Route53::RecordSet
+            Properties:
+              HostedZoneId: { Ref: DevOpsDemoPrivateHostedZone }
+              Name: efs.cluster.kublr.local
+              ResourceRecords:
+                - { "Fn::Sub": [ '${EFS}.efs.${AWS::Region}.amazonaws.com', { EFS: { Ref: DevOpsDemoEFS } } ] }
+              TTL: "300"
+              Type: CNAME
+  network:
+    apiServerSecurePort: 443
+  nodes:
+    - name: group1
+      locations:
+        - locationRef: aws1
+          aws:
+            instanceType: m5a.large
+            instanceMonitoring: false
+            rootVolume:
+              size: 40
+            availabilityZones:
+              - us-east-1e
+              - us-east-1f
+            overrideImageId: ami-02354e95b39ca8dec
+            imageRootDeviceName: /dev/xvda
+            groupType: asg-mip
+            mixedInstancesPolicyCloudFormationExtras:
+              InstancesDistribution:
+                OnDemandPercentageAboveBaseCapacity: 0
+              LaunchTemplate:
+                Overrides:
+                  - InstanceType: m5a.large
+                  - InstanceType: m5.large
+                  - InstanceType: m5ad.large
+                  - InstanceType: m5d.large
+                  - InstanceType: m5n.large
+                  - InstanceType: m5dn.large
+                  - InstanceType: t3.large
+            sshKey: cloudify
+            subnetIds:
+              - ''
+              - ''
+      kublrVariant: aws-ubuntu-18.04
+      autoscaling: false
+      minNodes: 2
+  features:
+    logging:
+      logCollection:
+        enabled: false
+      sinks:
+        - selfHosted:
+            enabled: false
+            masterNodes: 1
+            dataNodes: 1
+            clientNodes: 1
+        - centralLogging:
+            enabled: true
+            masterNodes: 1
+            dataNodes: 1
+            clientNodes: 1
+            logstashReplicas: 1
+            persistent: true
+            size: 128G
+      chart:
+        version: 1.20.1-1
+    monitoring:
+      enabled: false
+      platformClient:
+        enabled: true
+        prometheus:
+          persistent: false
+      chart:
+        version: 1.20.1-1
+    ingress:
+      ingressControllers:
+        - nginx:
+            enabled: false
+      chart:
+        version: 1.20.1-1
+    system:
+      chart:
+        version: 1.20.1-1
+    kubedb:
+      enabled: false
+      chart:
+        version: 1.20.1-1
+    kublrOperator:
+      enabled: true
+      chart:
+        version: 1.20.1-1
+  packages:
+    nfs-subdir-external-provisioner:
+      helmVersion: '3.4.0'
+      namespace: kube-system
+      releaseName: nfs-subdir-external-provisioner
+      chart:
+        name: nfs-subdir-external-provisioner
+        url: https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner/releases/download/nfs-subdir-external-provisioner-3.0.0/nfs-subdir-external-provisioner-3.0.0.tgz
+      values:
+        nfs:
+          server: efs.cluster.kublr.local
+          path: /
+        storageClass:
+          provisionerName: example.io/nfs

@@ -1,0 +1,93 @@
+kind: Cluster
+metadata:
+  name: persistence-101-azure
+  space: transient
+spec:
+  master:
+    locations:
+      - azure:
+          instanceType: Standard_A2_v2
+          osDisk:
+            imagePublisher: Canonical
+            imageOffer: UbuntuServer
+            imageVersion: 18.04-LTS
+            type: image
+            diskSizeGb: 40
+          sshKeySecretRef: cloudify
+          zones: []
+          pinToZone: default
+        locationRef: azure1
+    minNodes: 1
+    kublrAgentConfig:
+      kublr:
+        psp:
+          default_clusterrole: 'psp:privileged'
+  kublrAgentTgzUrl: 'https://repo.kublr.com/repository/gobinaries/kublr/1.19.7-26/kublr-1.19.7-26-linux.tar.gz'
+  locations:
+    - name: azure1
+      azure:
+        region: eastus
+        azureApiAccessSecretRef: azure-demo
+  network:
+    apiServerSecurePort: 443
+  nodes:
+    - name: group1
+      locations:
+        - locationRef: azure1
+          azure:
+            instanceType: Standard_A8_v2
+            osDisk:
+              imagePublisher: Canonical
+              imageOffer: UbuntuServer
+              imageVersion: 18.04-LTS
+              type: image
+              diskSizeGb: 40
+            sshKeySecretRef: cloudify
+            zones: []
+            pinToZone: default
+      minNodes: 2
+  features:
+    logging:
+      logCollection:
+        enabled: false
+      sinks:
+        - selfHosted:
+            enabled: false
+            masterNodes: 1
+            dataNodes: 1
+            clientNodes: 1
+        - centralLogging:
+            enabled: true
+            masterNodes: 1
+            dataNodes: 1
+            clientNodes: 1
+            logstashReplicas: 1
+            persistent: true
+            size: 128G
+      chart:
+        version: 1.20.1-1
+    monitoring:
+      enabled: false
+      platformClient:
+        enabled: true
+        prometheus:
+          persistent: false
+      chart:
+        version: 1.20.1-1
+    ingress:
+      ingressControllers:
+        - nginx:
+            enabled: false
+      chart:
+        version: 1.20.1-1
+    system:
+      chart:
+        version: 1.20.1-1
+    kubedb:
+      enabled: false
+      chart:
+        version: 1.20.1-1
+    kublrOperator:
+      enabled: true
+      chart:
+        version: 1.20.1-1
