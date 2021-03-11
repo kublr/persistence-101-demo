@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sts-aws-efs
+spec:
+  clusterIP: None
+  # ports:
+  #   - port: 9300
+  #     targetPort: transport
+  selector:
+    app: sts-aws-efs
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sts-aws-efs
+spec:
+  serviceName: sts-aws-efs
+  selector:
+    matchLabels:
+      app: sts-aws-efs
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sts-aws-efs
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: main
+          image: alpine
+          command: [sh, -c, 'while true ; do date ; df -h /vol ; ls -la /vol ; sleep 5 ; done']
+          volumeMounts:
+            - name: data
+              mountPath: /vol
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteMany
+        storageClassName: nfs-client
+        resources:
+          requests:
+            storage: "1Gi"
