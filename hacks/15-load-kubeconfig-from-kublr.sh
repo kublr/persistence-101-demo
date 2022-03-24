@@ -31,7 +31,7 @@ function getConfig() {
   fi
 }
 
-KCP_SPACE=transient
+KCP_SPACE=${KCP_SPACE:-default}
 
 KCP_CLUSTER=persistence-101-aws
 

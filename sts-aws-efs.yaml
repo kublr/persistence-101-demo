@@ -9,7 +9,9 @@ spec:
   #     targetPort: transport
   selector:
     app: sts-aws-efs
+
 ---
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

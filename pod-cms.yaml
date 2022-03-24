@@ -6,7 +6,9 @@ data:
   config.yaml: |
     # example config content
     some: config
+
 ---
+
 apiVersion: v1
 kind: Pod
 metadata:
